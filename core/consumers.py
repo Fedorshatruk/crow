@@ -25,12 +25,13 @@ class GameConsumer(WebsocketConsumer):
 
     # Receive message from WebSocket
     def receive(self, text_data):
-        print(text_data)
+        print(self.scope['user'].id)
         text_data_json = json.loads(text_data)
         message = text_data_json
         if message['type'] == 'get_games':
             self.send(json.dumps(get_session_list_controller()))
         elif message['type'] == 'change_db':
+            print('change_db')
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
@@ -40,6 +41,7 @@ class GameConsumer(WebsocketConsumer):
             )
 
     def send_game_data(self, _):
+        print('work')
         data = get_session_list_controller()
         self.send(text_data=json.dumps(
             data
