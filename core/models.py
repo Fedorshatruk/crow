@@ -14,7 +14,6 @@ def send_sok_change_session_id(session_id):
     async_to_sync(channel_layer.group_send)(f"session_{session_id}", {"type": "send_detail_data", 'pk': f'{session_id}'})
 
 
-
 CITIES = (
     ('NF', "Неверфол"),
     ('TT', "Тортуга"),
@@ -33,6 +32,19 @@ ROLES = (
     ('manufacturer', 'Производитель'),
 )
 
+turn_time_default = {
+    1: 15,
+    2: 10,
+    3: 10,
+    4: 10,
+    5: 7,
+    6: 7,
+    7: 7,
+    8: 7,
+    9: 7,
+    10: 7
+}
+
 
 class MainUser(AbstractUser):
     """Модель пользователя платформы"""
@@ -48,8 +60,10 @@ class GameSetting(models.Model):
     """Модель пресета настроек игры"""
     manufacturer_balance = models.PositiveIntegerField(verbose_name='Баланс производителя')
     broker_balance = models.PositiveIntegerField(verbose_name="Баланс маклера")
-    crown_balance = models.PositiveIntegerField(verbose_name="Баланс короны")
+    crown_balance = models.PositiveIntegerField(verbose_name="Баланс короны", default=12000)
     transaction_limit = models.PositiveIntegerField(verbose_name="Лимит сделки")
+    number_of_brokers = models.PositiveIntegerField(verbose_name='Количество маклеров в сессии', default=3)
+    turn_time_preset = models.TextField(default=turn_time_default)  # JSONField; ячейка должна хранить словарь с временами ходов
 
     def __str__(self):
         return f'Сет настроек {self.pk}'
@@ -66,7 +80,6 @@ class Session(models.Model):
     turn_count = models.PositiveIntegerField(verbose_name='Количество игровых ходов')
     settings = models.ForeignKey(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
-    crown_balance = models.PositiveIntegerField(default=12000, verbose_name='Баланс Короны')
     is_started = models.BooleanField(default=False)
 
     def __str__(self):
@@ -171,14 +184,6 @@ class Turn(models.Model):
     class Meta:
         verbose_name = 'Ход'
         verbose_name_plural = 'Ходы'
-    
-    def save(self, *args, **kwargs):
-        if self.pk is not None:
-            orig = Turn.objects.get(pk=self.pk)
-            if not orig.turn_finished:
-                # FIXME Нужно доставать время следующего хода из пресетов
-                Turn.objects.create(session=self.session, turn_time=10)
-        super(Turn, self).save(*args, **kwargs)
 
 
 class Transaction(models.Model):
@@ -191,7 +196,6 @@ class Transaction(models.Model):
     billet_price = models.PositiveIntegerField(verbose_name="Цена за заготовку")
     costs_transporting_single = models.PositiveIntegerField(default=10)
     approved_by_broker = models.BooleanField(default=False)
-    # FIXME Поменял ссылку на номер хода с отдельной модели на ссылку статуса сессии
     turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='')
 
     def __str__(self):
