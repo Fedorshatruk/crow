@@ -11,8 +11,8 @@ def send_sok_get_games():
 
 def send_sok_change_session_id(session_id):
     channel_layer = get_channel_layer()
-    async_to_sync(channel_layer.group_send)(f"session_{session_id}", {"type": "send_detail_data", 'pk': f'{session_id}'})
-
+    async_to_sync(channel_layer.group_send)(f"session_{session_id}",
+                                            {"type": "send_detail_data", 'pk': f'{session_id}'})
 
 CITIES = (
     ('NF', "Неверфол"),
@@ -22,14 +22,20 @@ CITIES = (
     ('AD', "Алендор"),
     ('ET', "Этруа"),)
 
+CREATED = 'Created'
+FILLED = 'Filled'
+
 SESSION_STATUS = (
-    ('Created', "Сессия создана"),
-    ('Filled', "Сессия заполнена"),
+    (CREATED, "Сессия создана"),
+    (FILLED, "Сессия заполнена"),
 )
 
+BROKER = 'broker'
+MANUFACTURER = 'manufacturer'
+
 ROLES = (
-    ('broker', 'Маклер'),
-    ('manufacturer', 'Производитель'),
+    (BROKER, 'Маклер'),
+    (MANUFACTURER, 'Производитель'),
 )
 
 turn_time_default = {
@@ -81,6 +87,10 @@ class Session(models.Model):
     settings = models.ForeignKey(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
     is_started = models.BooleanField(default=False)
+<<<<<<< HEAD
+=======
+    player_count = models.IntegerField(verbose_name="количество игроков", default=14)
+>>>>>>> a14be9c7d87c8373fb1f7ec39c486c021e0eff1f
 
     def __str__(self):
         return f'Сессия "{self.name}"'
@@ -88,10 +98,12 @@ class Session(models.Model):
     class Meta:
         verbose_name = 'Игровая сессия'
         verbose_name_plural = 'Игровые сессии'
-    # TODO много логики в методе save!
-    # 1. При создании создаем шаги OK
-    # 2. При старте игры используем для подсчета первый шаг и каждый шаг это атоинкремент!
-    # 3. При завершении хода turn_finished в шаге в статус True
+
+    def get_broker_balance(self):
+        return self.settings.broker_balance
+
+    def get_manufacturer_balance(self):
+        return self.settings.manufacturer_balance
 
     def save(self, *args, **kwargs):
         create_turn = True if not self.pk else False
@@ -99,7 +111,7 @@ class Session(models.Model):
         if create_turn:
             for i in range(self.turn_count):
                 Turn.objects.create(
-                    turn_num=i+1,
+                    turn_num=i + 1,
                     session=self
                 )
         send_sok_get_games()
@@ -147,6 +159,15 @@ class Player(models.Model):
                 else:
                     self.balance = self.session.settings.manufacturer_balance
         super().save(*args, **kwargs)
+        if self.session.player_count == self.session.player.all().count():
+            session = self.session
+            session.status = FILLED
+            session.save()
+        if self.is_bankrupt:
+            pass # место для сокета
+        if self.turn_finished:
+            pass
+
         if send:
             send_sok_get_games()
 
@@ -184,18 +205,24 @@ class Warehouse(models.Model):
 class Turn(models.Model):
     """Модель хода"""
     turn_num = models.IntegerField(verbose_name='Номер хода')
-    session = models.ForeignKey(Session, verbose_name='Сессия', on_delete=models.CASCADE)
+    session = models.ForeignKey(Session, verbose_name='Сессия', on_delete=models.CASCADE, related_name='turn')
     turn_time = models.PositiveIntegerField(verbose_name='Время хода', blank=True, default=30)
 
     # FIXME состакать с таймером
     turn_finished = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'Ход № {self.turn_num} Сессия №{self.session.id} {self.pk}'
+        return f'Ход № {self.turn_num} Сессия №{self.session} {self.pk}'
 
     class Meta:
         verbose_name = 'Ход'
         verbose_name_plural = 'Ходы'
+<<<<<<< HEAD
+=======
+
+    def save(self, *args, **kwargs):
+        super(Turn, self).save(*args, **kwargs)
+>>>>>>> a14be9c7d87c8373fb1f7ec39c486c021e0eff1f
 
 
 class Transaction(models.Model):
@@ -208,7 +235,12 @@ class Transaction(models.Model):
     billet_price = models.PositiveIntegerField(verbose_name="Цена за заготовку")
     costs_transporting_single = models.PositiveIntegerField(default=10)
     approved_by_broker = models.BooleanField(default=False)
+<<<<<<< HEAD
     turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='')
+=======
+    # FIXME Поменял ссылку на номер хода с отдельной модели на ссылку статуса сессии
+    turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='', null=True)
+>>>>>>> a14be9c7d87c8373fb1f7ec39c486c021e0eff1f
 
     def __str__(self):
         return f'Сделка между {self.manufacturer} и {self.broker} на {self.turn} ходу'
@@ -216,6 +248,11 @@ class Transaction(models.Model):
     class Meta:
         verbose_name = 'Сделка'
         verbose_name_plural = 'Сделки'
+
+    def save(self, *args, **kwargs):
+        print(Turn.objects.exclude(turn_finished=True).filter(session=self.broker.session).first())
+        self.turn = Turn.objects.exclude(turn_finished=True).filter(session=self.broker.session).first()
+        super().save(*args, **kwargs)
 
 
 class UserWebSocket(models.Model):
