@@ -150,7 +150,11 @@ class Player(models.Model):
         if self.is_bankrupt:
             pass # место для сокета
         if self.turn_finished:
-            pass
+            if self.session.player.filter(turn_finished=False, is_bankrupt=False).all().count() == 0:
+                obj = Turn.objects.exclude(turn_finished=True).filter(session=self.session).first()
+                obj.turn_finished = True
+                obj.save()
+
 
         if send:
             send_sok_get_games()
@@ -204,6 +208,7 @@ class Turn(models.Model):
 
     def save(self, *args, **kwargs):
         super(Turn, self).save(*args, **kwargs)
+        #count_brokers(session_id=self.session.pk, turn_id=self.pk)
 
 
 class Transaction(models.Model):
@@ -227,7 +232,6 @@ class Transaction(models.Model):
         verbose_name_plural = 'Сделки'
 
     def save(self, *args, **kwargs):
-        print(Turn.objects.exclude(turn_finished=True).filter(session=self.broker.session).first())
         self.turn = Turn.objects.exclude(turn_finished=True).filter(session=self.broker.session).first()
         super().save(*args, **kwargs)
 
