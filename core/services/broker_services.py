@@ -1,9 +1,9 @@
-from ..models import Player, Transaction
+# from ..models import Player, Transaction
 
 costs_fixed = 1000
 
 
-def count_brokers(session_id: int, turn_id: int):
+def count_brokers(session_id: int, turn_id: int, player, transaction):
     """
     Функция просчитывает игровые параметры маклеров и записывает новые параметры в БД.
     :param session_id: id игровой сессии
@@ -12,8 +12,8 @@ def count_brokers(session_id: int, turn_id: int):
     """
 
     market_billets_count = 0
-    market_transactions = Transaction.objects.filter(session_id=session_id, turn_id=turn_id)
-    brokers = Player.objects.filter(session_id=session_id, role='broker', is_bankrupt=False)
+    market_transactions = transaction.objects.filter(turn_id=turn_id)
+    brokers = player.objects.filter(session_id=session_id, role='broker', is_bankrupt=False)
 
     for transaction in market_transactions:
         market_billets_count += transaction.number_of_billets
