@@ -4,8 +4,6 @@
 Сделки, использованные в пересчёте, должны быть взяты только для i-го хода.
 """
 
-from ..models import Player
-
 
 class InvalidBilletAmountException(Exception):
     """Ошибка для некорректно введённых расчётных данных"""
@@ -73,7 +71,7 @@ def count_costs_negotiation(number_of_transactions):
     return number_of_transactions * costs_negotiation_single
 
 
-def count_manufacturers(session_id: int, turn_id: int):
+def count_manufacturers(session_id: int, turn_id: int, player, warehouse):
     """
     Функция просчитывает игровые параметры для производителей и записывает новые параметры в БД.
     :param session_id: id игровой сессии
@@ -81,13 +79,18 @@ def count_manufacturers(session_id: int, turn_id: int):
     :return: обновляет игровые параметры производителей
     """
 
-    manufacturers = Player.objects.filter(session_id=session_id, role='manufacturer', is_bankrupt=False)
+    manufacturers = player.objects.filter(session_id=session_id, role='manufacturer', is_bankrupt=False)
 
     for manufacturer in manufacturers:
 
         billets_produced = manufacturer.production.get().billets_produced
-        warehousing = manufacturer.warehouse.first()
-        billets_stored = warehousing.billets
+        warehousing = warehouse.objects.filter(player_id=manufacturer.id)
+        try:
+            billets_stored = warehousing.billets
+        except AttributeError:
+            warehousing = warehouse.objects.create(player_id=manufacturer.id)
+            warehousing.save()
+            billets_stored = warehousing.billets
         transactions = manufacturer.transaction_m.filter(turn_id=turn_id, approved_by_broker=True)
         transaction_count = transactions.count()
 

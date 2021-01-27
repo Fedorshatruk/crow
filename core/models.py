@@ -2,6 +2,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from .services.broker_services import count_brokers
+from .services.manufacturer_services import count_manufacturers
 
 
 def send_sok_get_games():
@@ -13,7 +15,6 @@ def send_sok_change_session_id(session_id):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(f"session_{session_id}",
                                             {"type": "send_detail_data", 'pk': f'{session_id}'})
-
 
 CITIES = (
     ('NF', "Неверфол"),
@@ -39,6 +40,19 @@ ROLES = (
     (MANUFACTURER, 'Производитель'),
 )
 
+turn_time_default = {
+    1: 15,
+    2: 10,
+    3: 10,
+    4: 10,
+    5: 7,
+    6: 7,
+    7: 7,
+    8: 7,
+    9: 7,
+    10: 7
+}
+
 
 class MainUser(AbstractUser):
     """Модель пользователя платформы"""
@@ -48,14 +62,14 @@ class MainUser(AbstractUser):
         verbose_name_plural = 'Пользователи'
 
 
-# FIXME Значения настроек должны быть строгими и зависеть от количества игроков в лобби
-# Скорее всего, мы их сделаем сами ручками и впоследствии трогать не будем
 class GameSetting(models.Model):
     """Модель пресета настроек игры"""
     manufacturer_balance = models.PositiveIntegerField(verbose_name='Баланс производителя')
     broker_balance = models.PositiveIntegerField(verbose_name="Баланс маклера")
-    crown_balance = models.PositiveIntegerField(verbose_name="Баланс короны")
+    crown_balance = models.PositiveIntegerField(verbose_name="Баланс короны", default=12000)
     transaction_limit = models.PositiveIntegerField(verbose_name="Лимит сделки")
+    number_of_brokers = models.PositiveIntegerField(verbose_name='Количество маклеров в сессии', default=3)
+    turn_time_preset = models.TextField(default=turn_time_default)  # JSONField; ячейка должна хранить словарь с временами ходов
 
     def __str__(self):
         return f'Сет настроек {self.pk}'
@@ -70,9 +84,11 @@ class Session(models.Model):
 
     name = models.CharField(max_length=255, verbose_name='Название сессии')
     turn_count = models.PositiveIntegerField(verbose_name='Количество игровых ходов')
-    settings = models.ForeignKey(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True)
+    # FIXME Не работает, как надо:
+    #  Нужно, чтобы при создании сесии
+    settings = models.OneToOneField(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True,
+                                 default=None)
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
-    crown_balance = models.PositiveIntegerField(default=12000, verbose_name='Баланс Короны')
     is_started = models.BooleanField(default=False)
     player_count = models.IntegerField(verbose_name="количество игроков", default=14)
 
@@ -155,7 +171,6 @@ class Player(models.Model):
                 obj.turn_finished = True
                 obj.save()
 
-
         if send:
             send_sok_get_games()
 
@@ -207,8 +222,9 @@ class Turn(models.Model):
         verbose_name_plural = 'Ходы'
 
     def save(self, *args, **kwargs):
+        count_brokers(self.session.pk, self.pk, Player, Transaction)
+        count_manufacturers(self.session.pk, self.pk, Player, Warehouse)
         super(Turn, self).save(*args, **kwargs)
-        #count_brokers(session_id=self.session.pk, turn_id=self.pk)
 
 
 class Transaction(models.Model):
@@ -221,8 +237,7 @@ class Transaction(models.Model):
     billet_price = models.PositiveIntegerField(verbose_name="Цена за заготовку")
     costs_transporting_single = models.PositiveIntegerField(default=10)
     approved_by_broker = models.BooleanField(default=False)
-    # FIXME Поменял ссылку на номер хода с отдельной модели на ссылку статуса сессии
-    turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='', null=True)
+    turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='')
 
     def __str__(self):
         return f'Сделка между {self.manufacturer} и {self.broker} на {self.turn} ходу'
