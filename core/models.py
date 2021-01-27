@@ -2,6 +2,8 @@ from django.contrib.auth.models import AbstractUser
 from django.db import models
 from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
+from .services.broker_services import count_brokers
+from .services.manufacturer_services import count_manufacturers
 
 
 def send_sok_get_games():
@@ -82,7 +84,10 @@ class Session(models.Model):
 
     name = models.CharField(max_length=255, verbose_name='Название сессии')
     turn_count = models.PositiveIntegerField(verbose_name='Количество игровых ходов')
-    settings = models.ForeignKey(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True)
+    # FIXME Не работает, как надо:
+    #  Нужно, чтобы при создании сесии
+    settings = models.OneToOneField(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True,
+                                 default=None)
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
     is_started = models.BooleanField(default=False)
     player_count = models.IntegerField(verbose_name="количество игроков", default=14)
@@ -161,7 +166,10 @@ class Player(models.Model):
         if self.is_bankrupt:
             pass # место для сокета
         if self.turn_finished:
-            pass
+            if self.session.player.filter(turn_finished=False, is_bankrupt=False).all().count() == 0:
+                obj = Turn.objects.exclude(turn_finished=True).filter(session=self.session).first()
+                obj.turn_finished = True
+                obj.save()
 
         if send:
             send_sok_get_games()
@@ -213,6 +221,11 @@ class Turn(models.Model):
         verbose_name = 'Ход'
         verbose_name_plural = 'Ходы'
 
+    def save(self, *args, **kwargs):
+        count_brokers(self.session.pk, self.pk, Player, Transaction)
+        count_manufacturers(self.session.pk, self.pk, Player, Warehouse)
+        super(Turn, self).save(*args, **kwargs)
+
 
 class Transaction(models.Model):
     """Модель транзакции"""
@@ -234,7 +247,6 @@ class Transaction(models.Model):
         verbose_name_plural = 'Сделки'
 
     def save(self, *args, **kwargs):
-        print(Turn.objects.exclude(turn_finished=True).filter(session=self.broker.session).first())
         self.turn = Turn.objects.exclude(turn_finished=True).filter(session=self.broker.session).first()
         super().save(*args, **kwargs)
 
