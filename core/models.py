@@ -82,7 +82,6 @@ class Session(models.Model):
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
     is_started = models.BooleanField(default=False)
 
-
     def __str__(self):
         return f'Сессия "{self.name}"'
 
