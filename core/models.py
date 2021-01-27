@@ -60,8 +60,6 @@ class MainUser(AbstractUser):
         verbose_name_plural = 'Пользователи'
 
 
-# FIXME Значения настроек должны быть строгими и зависеть от количества игроков в лобби
-# Скорее всего, мы их сделаем сами ручками и впоследствии трогать не будем
 class GameSetting(models.Model):
     """Модель пресета настроек игры"""
     manufacturer_balance = models.PositiveIntegerField(verbose_name='Баланс производителя')
@@ -87,10 +85,7 @@ class Session(models.Model):
     settings = models.ForeignKey(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True)
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
     is_started = models.BooleanField(default=False)
-<<<<<<< HEAD
-=======
     player_count = models.IntegerField(verbose_name="количество игроков", default=14)
->>>>>>> a14be9c7d87c8373fb1f7ec39c486c021e0eff1f
 
     def __str__(self):
         return f'Сессия "{self.name}"'
@@ -217,12 +212,6 @@ class Turn(models.Model):
     class Meta:
         verbose_name = 'Ход'
         verbose_name_plural = 'Ходы'
-<<<<<<< HEAD
-=======
-
-    def save(self, *args, **kwargs):
-        super(Turn, self).save(*args, **kwargs)
->>>>>>> a14be9c7d87c8373fb1f7ec39c486c021e0eff1f
 
 
 class Transaction(models.Model):
@@ -235,12 +224,7 @@ class Transaction(models.Model):
     billet_price = models.PositiveIntegerField(verbose_name="Цена за заготовку")
     costs_transporting_single = models.PositiveIntegerField(default=10)
     approved_by_broker = models.BooleanField(default=False)
-<<<<<<< HEAD
     turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='')
-=======
-    # FIXME Поменял ссылку на номер хода с отдельной модели на ссылку статуса сессии
-    turn = models.ForeignKey(Turn, on_delete=models.CASCADE, related_name='transaction', default='', null=True)
->>>>>>> a14be9c7d87c8373fb1f7ec39c486c021e0eff1f
 
     def __str__(self):
         return f'Сделка между {self.manufacturer} и {self.broker} на {self.turn} ходу'
