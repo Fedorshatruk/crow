@@ -12,7 +12,7 @@ def send_sok_get_games():
 def send_sok_change_session_id(session_id):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(f"session_{session_id}",
-                                            {"type": "send_detail_data", 'pk': f'{session_id}'})
+                                            {"type": "send_detail_data", 'session_id': f'{session_id}'})
 
 
 CITIES = (
@@ -208,7 +208,6 @@ class Turn(models.Model):
 
     def save(self, *args, **kwargs):
         super(Turn, self).save(*args, **kwargs)
-        #count_brokers(session_id=self.session.pk, turn_id=self.pk)
 
 
 class Transaction(models.Model):

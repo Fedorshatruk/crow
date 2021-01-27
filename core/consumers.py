@@ -70,23 +70,23 @@ class SessionDetailConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json
         if message['type'] == 'send_detail_data':
-            self.send({'type': 'send_detail_data', 'pk': message['pk']})
+            self.send({'type': 'send_detail_data', 'session_id': message['session_id']})
         elif message['type'] == 'GetDetailData':
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
                     'type': 'send_detail_data',
-                    'pk': message['pk']
+                    'session_id': message['session_id']
                 }
             )
 
     def send_detail_data(self, event):
-        pk = int(event['pk'])
+        pk = int(event['session_id'])
         data = get_session_detail_controller(pk)
-        self.send(text_data=json.dumps({
-            'type': 'send_detail_data',
-            'data': data
-        }))
+
+        self.send(text_data=json.dumps(
+            data[0]
+        ))
 
 
 class UserConsumer(WebsocketConsumer):
@@ -111,18 +111,18 @@ class UserConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json
         if message['type'] == 'send_detail_data':
-            self.send({'type': 'send_detail_data', 'pk': message['pk']})
+            self.send({'type': 'send_detail_data', 'session_id': message['session_id']})
         elif message['type'] == 'GetDetailData':
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
                     'type': 'send_detail_data',
-                    'pk': message['pk']
+                    'session_id': message['session_id']
                 }
             )
 
     def send_detail_data(self, event):
-        pk = int(event['pk'])
+        pk = int(event['session_id'])
         data = get_session_detail_controller(pk)
         self.send(text_data=json.dumps({
             'type': 'send_detail_data',
