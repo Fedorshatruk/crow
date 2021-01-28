@@ -4,6 +4,7 @@ from channels.layers import get_channel_layer
 from asgiref.sync import async_to_sync
 from .services.broker_services import count_brokers
 from .services.manufacturer_services import count_manufacturers
+from random import choices
 from countdowntimer_model.models import CountdownTimer
 from .services.timer import set_turn_timers
 
@@ -16,7 +17,7 @@ def send_sok_get_games():
 def send_sok_change_session_id(session_id):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(f"session_{session_id}",
-                                            {"type": "send_detail_data", 'pk': f'{session_id}'})
+                                            {"type": "send_detail_data", 'session_id': f'{session_id}'})
 
 
 CITIES = (
@@ -88,7 +89,7 @@ class Session(models.Model):
     player_count = models.IntegerField(verbose_name="количество игроков", default=14)
 
     def __str__(self):
-        return f'Сессия "{self.name}"'
+        return f'Сессия "{self.name}" {self.pk}'
 
     class Meta:
         verbose_name = 'Игровая сессия'
@@ -130,8 +131,15 @@ class Player(models.Model):
     nickname = models.CharField(max_length=255, verbose_name='Никнейм', default='')
     user = models.ForeignKey(MainUser, on_delete=models.CASCADE, related_name='player')
     session = models.ForeignKey(Session, on_delete=models.SET_NULL, related_name='player', null=True)
-    city = models.CharField(max_length=10, choices=CITIES, verbose_name='Город', null=True)
-    role = models.CharField(max_length=20, choices=ROLES, verbose_name='Игровая роль', blank=True, default='')
+    city = models.CharField(max_length=10, choices=CITIES,
+                            verbose_name='Город',
+                            null=True,
+                            default=choices(CITIES)[0][0]
+                            )
+    role = models.CharField(max_length=20, choices=ROLES,
+                            verbose_name='Игровая роль', blank=True,
+                            default=''
+                            )
     balance = models.IntegerField(default=0)
     is_bankrupt = models.BooleanField(default=False)
     turn_finished = models.BooleanField(default=False)
@@ -145,7 +153,7 @@ class Player(models.Model):
 
     def save(self, *args, **kwargs):
         send = False
-        if self.session.status == 'Created':
+        if self.session.status == CREATED or self.session.status == FILLED and not self.session.is_started:
             if not self.role:
                 send = True
             else:
@@ -172,7 +180,7 @@ class Player(models.Model):
 
 class Production(models.Model):
     """Модель запроса на производство"""
-    manufacturer = models.ForeignKey(Player,
+    manufacturer = models.OneToOneField(Player,
                                      on_delete=models.SET_NULL,
                                      null=True,
                                      related_name='production',
@@ -222,7 +230,7 @@ class Turn(models.Model):
 
     def save(self, *args, **kwargs):
         count_brokers(self.session.pk, self.pk, Player, Transaction)
-        count_manufacturers(self.session.pk, self.pk, Player, Warehouse)
+        count_manufacturers(self.session.pk, self.pk, Player, Warehouse, Production)
         super(Turn, self).save(*args, **kwargs)
 
 

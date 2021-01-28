@@ -2,7 +2,10 @@ from asgiref.sync import async_to_sync
 from channels.generic.websocket import WebsocketConsumer
 import json
 
-from .services.websocket_services.controllers import get_session_list_controller, get_session_detail_controller
+from rest_framework.authtoken.models import Token
+
+from .services.websocket_services.controllers import get_session_list_controller, get_session_detail_controller, \
+    create_player
 
 
 class GameConsumer(WebsocketConsumer):
@@ -25,6 +28,7 @@ class GameConsumer(WebsocketConsumer):
 
     # Receive message from WebSocket
     def receive(self, text_data):
+        print(self.scope)
         print(self.scope['user'].id)
         text_data_json = json.loads(text_data)
         message = text_data_json
@@ -51,7 +55,12 @@ class GameConsumer(WebsocketConsumer):
 class SessionDetailConsumer(WebsocketConsumer):
     def connect(self):
         self.session_id = self.scope['url_route']['kwargs']['session_id']
+        self.user_token = self.scope['url_route']['kwargs']['token']
         self.room_group_name = f'session_{self.session_id}'
+        self.token = Token.objects.filter(key=self.user_token).first()
+        print(self.token)
+        if self.token:
+            create_player(self.token, self.session_id)
         async_to_sync(self.channel_layer.group_add)(
             self.room_group_name,
             self.channel_name
@@ -70,23 +79,22 @@ class SessionDetailConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json
         if message['type'] == 'send_detail_data':
-            self.send({'type': 'send_detail_data', 'pk': message['pk']})
+            self.send({'type': 'send_detail_data', 'session_id': message['session_id']})
         elif message['type'] == 'GetDetailData':
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
                     'type': 'send_detail_data',
-                    'pk': message['pk']
+                    'session_id': message['session_id']
                 }
             )
 
     def send_detail_data(self, event):
-        pk = int(event['pk'])
+        pk = int(event['session_id'])
         data = get_session_detail_controller(pk)
-        self.send(text_data=json.dumps({
-            'type': 'send_detail_data',
-            'data': data
-        }))
+        self.send(text_data=json.dumps(
+            data[0]
+        ))
 
 
 class UserConsumer(WebsocketConsumer):
@@ -111,18 +119,18 @@ class UserConsumer(WebsocketConsumer):
         text_data_json = json.loads(text_data)
         message = text_data_json
         if message['type'] == 'send_detail_data':
-            self.send({'type': 'send_detail_data', 'pk': message['pk']})
+            self.send({'type': 'send_detail_data', 'session_id': message['session_id']})
         elif message['type'] == 'GetDetailData':
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
                     'type': 'send_detail_data',
-                    'pk': message['pk']
+                    'session_id': message['session_id']
                 }
             )
 
     def send_detail_data(self, event):
-        pk = int(event['pk'])
+        pk = int(event['session_id'])
         data = get_session_detail_controller(pk)
         self.send(text_data=json.dumps({
             'type': 'send_detail_data',
