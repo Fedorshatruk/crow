@@ -5,6 +5,9 @@ from asgiref.sync import async_to_sync
 from .services.broker_services import count_brokers
 from .services.manufacturer_services import count_manufacturers
 from random import choices
+from countdowntimer_model.models import CountdownTimer
+from .services.timer import set_turn_timers
+
 
 def send_sok_get_games():
     channel_layer = get_channel_layer()
@@ -15,6 +18,7 @@ def send_sok_change_session_id(session_id):
     channel_layer = get_channel_layer()
     async_to_sync(channel_layer.group_send)(f"session_{session_id}",
                                             {"type": "send_detail_data", 'session_id': f'{session_id}'})
+
 
 CITIES = (
     ('NF', "Неверфол"),
@@ -40,19 +44,6 @@ ROLES = (
     (MANUFACTURER, 'Производитель'),
 )
 
-turn_time_default = {
-    1: 15,
-    2: 10,
-    3: 10,
-    4: 10,
-    5: 7,
-    6: 7,
-    7: 7,
-    8: 7,
-    9: 7,
-    10: 7
-}
-
 
 class MainUser(AbstractUser):
     """Модель пользователя платформы"""
@@ -62,6 +53,11 @@ class MainUser(AbstractUser):
         verbose_name_plural = 'Пользователи'
 
 
+class TurnCountdownTimer(CountdownTimer):
+    def __str__(self):
+        return f'Таймер {self.pk}'
+
+
 class GameSetting(models.Model):
     """Модель пресета настроек игры"""
     manufacturer_balance = models.PositiveIntegerField(verbose_name='Баланс производителя')
@@ -69,7 +65,6 @@ class GameSetting(models.Model):
     crown_balance = models.PositiveIntegerField(verbose_name="Баланс короны", default=12000)
     transaction_limit = models.PositiveIntegerField(verbose_name="Лимит сделки")
     number_of_brokers = models.PositiveIntegerField(verbose_name='Количество маклеров в сессии', default=3)
-    turn_time_preset = models.TextField(default=turn_time_default)  # JSONField; ячейка должна хранить словарь с временами ходов
 
     def __str__(self):
         return f'Сет настроек {self.pk}'
@@ -84,10 +79,11 @@ class Session(models.Model):
 
     name = models.CharField(max_length=255, verbose_name='Название сессии')
     turn_count = models.PositiveIntegerField(verbose_name='Количество игровых ходов')
-    # FIXME Не работает, как надо:
-    #  Нужно, чтобы при создании сесии
-    settings = models.OneToOneField(GameSetting, related_name='session', on_delete=models.SET_NULL, null=True,
-                                 default=None)
+    settings = models.OneToOneField(GameSetting,
+                                    related_name='session',
+                                    on_delete=models.SET_NULL,
+                                    null=True,
+                                    default=None)
     status = models.CharField(max_length=100, choices=SESSION_STATUS, verbose_name='Статус сессии', default='Created')
     is_started = models.BooleanField(default=False)
     player_count = models.IntegerField(verbose_name="количество игроков", default=14)
@@ -201,7 +197,7 @@ class Production(models.Model):
 
 class Warehouse(models.Model):
     """Модель склада производителей"""
-    player = models.ForeignKey(Player,
+    player = models.OneToOneField(Player,
                                on_delete=models.SET_NULL,
                                null=True,
                                related_name='warehouse',
@@ -217,6 +213,10 @@ class Turn(models.Model):
     turn_num = models.IntegerField(verbose_name='Номер хода')
     session = models.ForeignKey(Session, verbose_name='Сессия', on_delete=models.CASCADE, related_name='turn')
     turn_time = models.PositiveIntegerField(verbose_name='Время хода', blank=True, default=30)
+    timer = models.OneToOneField(TurnCountdownTimer, verbose_name='Таймер хода',
+                                 on_delete=models.SET_NULL,
+                                 related_name='turn',
+                                 null=True)
 
     # FIXME состакать с таймером
     turn_finished = models.BooleanField(default=False)

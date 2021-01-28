@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'djoser',
     'core',
+    'countdowntimer_model'
 ]
 
 MIDDLEWARE = [
