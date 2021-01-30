@@ -1,4 +1,5 @@
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.permissions import IsAdminUser
 
 from .models import GameSetting, MainUser, Transaction, Session, Player, Production, Warehouse
 from .serializers import GameSettingSerializer, MainUserDetailSerializer, \
@@ -16,6 +17,7 @@ class SessionViewSet(ModelViewSet):
     """Вывод игровых ссесий"""
     queryset = Session.objects.exclude(status='Filled')
     serializer_class = SessionSerializer
+    permission_classes = [IsAdminUser,]
 
 
 class UserViewSet(ModelViewSet):

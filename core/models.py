@@ -230,7 +230,7 @@ class Turn(models.Model):
 
     def save(self, *args, **kwargs):
         count_brokers(self.session.pk, self.pk, Player, Transaction)
-        count_manufacturers(self.session.pk, self.pk, Player, Warehouse, Production)
+        count_manufacturers(self.session.pk, self.pk, Player, Warehouse)
         super(Turn, self).save(*args, **kwargs)
 
 

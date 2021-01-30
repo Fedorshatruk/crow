@@ -5,7 +5,7 @@ import json
 from rest_framework.authtoken.models import Token
 
 from .services.websocket_services.controllers import get_session_list_controller, get_session_detail_controller, \
-    create_player
+    create_player, delete_player
 
 
 class GameConsumer(WebsocketConsumer):
@@ -28,14 +28,11 @@ class GameConsumer(WebsocketConsumer):
 
     # Receive message from WebSocket
     def receive(self, text_data):
-        print(self.scope)
-        print(self.scope['user'].id)
         text_data_json = json.loads(text_data)
         message = text_data_json
         if message['type'] == 'get_games':
             self.send(json.dumps(get_session_list_controller()))
         elif message['type'] == 'change_db':
-            print('change_db')
             async_to_sync(self.channel_layer.group_send)(
                 self.room_group_name,
                 {
@@ -45,7 +42,6 @@ class GameConsumer(WebsocketConsumer):
             )
 
     def send_game_data(self, _):
-        print('work')
         data = get_session_list_controller()
         self.send(text_data=json.dumps(
             data
@@ -58,7 +54,6 @@ class SessionDetailConsumer(WebsocketConsumer):
         self.user_token = self.scope['url_route']['kwargs']['token']
         self.room_group_name = f'session_{self.session_id}'
         self.token = Token.objects.filter(key=self.user_token).first()
-        print(self.token)
         if self.token:
             create_player(self.token, self.session_id)
         async_to_sync(self.channel_layer.group_add)(
@@ -68,7 +63,7 @@ class SessionDetailConsumer(WebsocketConsumer):
         self.accept()
 
     def disconnect(self, close_code):
-        # Leave room group
+        delete_player(self.token, self.session_id)
         async_to_sync(self.channel_layer.group_discard)(
             self.room_group_name,
             self.channel_name

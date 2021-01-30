@@ -70,6 +70,9 @@ def count_costs_negotiation(number_of_transactions):
     return number_of_transactions * costs_negotiation_single
 
 
+
+
+
 def count_manufacturers(session_id: int, turn_id: int, player, warehouse):
     """
     Функция просчитывает игровые параметры для производителей и записывает новые параметры в БД.
@@ -81,9 +84,11 @@ def count_manufacturers(session_id: int, turn_id: int, player, warehouse):
     manufacturers = player.objects.filter(session_id=session_id, role='manufacturer', is_bankrupt=False)
 
     for manufacturer in manufacturers:
-
-        billets_produced = manufacturer.production.get().billets_produced
-        warehousing = warehouse.objects.filter(player_id=manufacturer.id)
+        try:
+            billets_produced = manufacturer.production.billets_produced
+        except:
+            billets_produced = 0
+        warehousing = warehouse.objects.filter(player_id=manufacturer.id).first()
         try:
             billets_stored = warehousing.billets
         except AttributeError:
@@ -94,9 +99,11 @@ def count_manufacturers(session_id: int, turn_id: int, player, warehouse):
         transaction_count = transactions.count()
 
         costs_fixed = count_costs_fixed(billets_produced)
+        print(costs_fixed)
         costs_variable = count_costs_variable(billets_produced)
+        print(costs_variable)
         costs_materials = count_costs_materials(billets_produced)
-
+        print(costs_materials)
         costs_production = costs_fixed + costs_variable + costs_materials
 
         balance_update_1 = manufacturer.balance - costs_production

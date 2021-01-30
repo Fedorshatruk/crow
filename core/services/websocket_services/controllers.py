@@ -24,3 +24,11 @@ def create_player(token: object, session_id: str):
     if user.player.all().count() == 0 or user.player.filter(session=session_id).count() == 0:
         Player.objects.create(nickname=user.username, user=user, session=session)
     print(session)
+
+
+def delete_player(token: object, session_id: str):
+    player = Player.objects.filter(user=token.user.id, session=session_id)
+    session = Session.objects.filter(id=session_id).first()
+    if not session.is_started:
+        player.delete()
+    print(session)

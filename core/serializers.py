@@ -54,5 +54,3 @@ class WarehouseSerializer(ModelSerializer):
     class Meta:
         model = Warehouse
         fields = '__all__'
-
-
